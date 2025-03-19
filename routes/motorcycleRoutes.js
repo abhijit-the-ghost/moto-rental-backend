@@ -3,91 +3,133 @@ const {
   authMiddleware,
   adminMiddleware,
 } = require("../middleware/authMiddleware");
+const upload = require("../middleware/upload");
 const Motorcycle = require("../models/Motorcycle");
 const router = express.Router();
 
-// ✅ Add a Motorcycle (Admin Only)
-router.post("/add", authMiddleware, adminMiddleware, async (req, res) => {
+// ✅ Get All Motorcycles (Public)
+router.get("/", async (req, res) => {
   try {
-    const { name, description, company, price } = req.body;
+    let { page = 1, limit = 5, search = "" } = req.query;
+    page = parseInt(page);
+    limit = parseInt(limit);
 
-    if (!name || !description || !company || !price) {
-      return res.status(400).json({ message: "All fields are required!" });
-    }
+    // Search Query
+    const query = {
+      $or: [
+        { name: new RegExp(search, "i") },
+        { company: new RegExp(search, "i") },
+        { status: new RegExp(search, "i") },
+      ],
+    };
 
-    const newMotorcycle = new Motorcycle({
-      name,
-      description,
-      company,
-      price,
-      addedBy: req.user.id, // ✅ Admin ID
+    // Get total count of motorcycles matching search criteria
+    const totalMotorcycles = await Motorcycle.countDocuments(query);
+
+    // Fetch paginated results
+    const motorcycles = await Motorcycle.find(query)
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    res.json({
+      totalMotorcycles,
+      totalPages: Math.ceil(totalMotorcycles / limit),
+      currentPage: page,
+      motorcycles,
     });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
 
-    await newMotorcycle.save();
-    res
-      .status(201)
-      .json({
+// ✅ Add a Motorcycle (Admin Only)
+router.post(
+  "/add",
+  authMiddleware,
+  adminMiddleware,
+  upload.single("image"),
+  async (req, res) => {
+    try {
+      console.log("Received Form Data:", req.body); // ✅ Log request body
+      console.log("Received File:", req.file); // ✅ Log file upload
+
+      const { name, company, description, price, status } = req.body;
+
+      if (!name || !company || !description || !price || !status || !req.file) {
+        return res.status(400).json({ message: "All fields are required!" });
+      }
+
+      const newMotorcycle = new Motorcycle({
+        name,
+        company,
+        description, // ✅ Ensure description is included
+        price: parseFloat(price), // ✅ Ensure price is converted to a number
+        status,
+        image: `/uploads/motorcycles/${req.file.filename}`,
+        addedBy: req.user.id,
+      });
+
+      await newMotorcycle.save();
+      res.status(201).json({
         message: "Motorcycle added successfully!",
         motorcycle: newMotorcycle,
       });
-  } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-});
-
-// ✅ Get All Motorcycles
-router.get("/", async (req, res) => {
-  try {
-    const motorcycles = await Motorcycle.find().populate(
-      "addedBy",
-      "firstName lastName email"
-    );
-    res.json(motorcycles);
-  } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-});
-
-// ✅ Rent a Motorcycle (User)
-router.patch("/rent/:id", authMiddleware, async (req, res) => {
-  try {
-    const motorcycle = await Motorcycle.findById(req.params.id);
-    if (!motorcycle) {
-      return res.status(404).json({ message: "Motorcycle not found!" });
+    } catch (error) {
+      console.error("Server Error:", error.message);
+      res.status(500).json({ message: "Server error", error: error.message });
     }
-
-    if (motorcycle.status === "Rented") {
-      return res.status(400).json({ message: "Motorcycle is already rented!" });
-    }
-
-    motorcycle.status = "Rented";
-    await motorcycle.save();
-    res.json({ message: "Motorcycle rented successfully!", motorcycle });
-  } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
   }
-});
+);
 
-// ✅ Return a Motorcycle (User)
-router.patch("/return/:id", authMiddleware, async (req, res) => {
-  try {
-    const motorcycle = await Motorcycle.findById(req.params.id);
-    if (!motorcycle) {
-      return res.status(404).json({ message: "Motorcycle not found!" });
+// ✅ Update Motorcycle (Admin Only)
+router.patch(
+  "/update/:id",
+  authMiddleware,
+  adminMiddleware,
+  upload.single("image"),
+  async (req, res) => {
+    try {
+      const { name, company, description, price, status } = req.body;
+      const motorcycle = await Motorcycle.findById(req.params.id);
+
+      if (!motorcycle) {
+        return res.status(404).json({ message: "Motorcycle not found!" });
+      }
+
+      motorcycle.name = name || motorcycle.name;
+      motorcycle.company = company || motorcycle.company;
+      motorcycle.description = description || motorcycle.description;
+      motorcycle.price = price ? parseFloat(price) : motorcycle.price;
+      motorcycle.status = status || motorcycle.status;
+
+      if (req.file) {
+        motorcycle.image = `/uploads/motorcycles/${req.file.filename}`;
+      }
+
+      await motorcycle.save();
+      res.json({ message: "Motorcycle updated successfully!", motorcycle });
+    } catch (error) {
+      res.status(500).json({ message: "Server error", error: error.message });
     }
-
-    if (motorcycle.status === "Available") {
-      return res
-        .status(400)
-        .json({ message: "Motorcycle is already available!" });
-    }
-
-    motorcycle.status = "Available";
-    await motorcycle.save();
-    res.json({ message: "Motorcycle returned successfully!", motorcycle });
-  } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
   }
-});
+);
+
+// ✅ Delete Motorcycle (Admin Only)
+router.delete(
+  "/delete/:id",
+  authMiddleware,
+  adminMiddleware,
+  async (req, res) => {
+    try {
+      const motorcycle = await Motorcycle.findByIdAndDelete(req.params.id);
+      if (!motorcycle) {
+        return res.status(404).json({ message: "Motorcycle not found!" });
+      }
+      res.json({ message: "Motorcycle deleted successfully!" });
+    } catch (error) {
+      res.status(500).json({ message: "Server error", error: error.message });
+    }
+  }
+);
 
 module.exports = router;

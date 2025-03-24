@@ -7,9 +7,12 @@ const UserSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     dob: { type: Date, required: true },
+    phoneNumber: { type: String, required: true }, // ✅ Added phone number field
     isForeigner: { type: Boolean, required: true },
     role: { type: String, enum: ["user", "admin"], default: "user" },
-    verified: { type: Boolean, default: false }, // ✅ New field for verification
+    verified: { type: Boolean, default: false },
+    drivingLicense: { type: String, default: "" }, // ✅ Store license image path
+    passport: { type: String, default: "" }, // ✅ Store passport image path (for foreigners)
     rentedMotorcycles: [
       {
         motorcycle: { type: mongoose.Schema.Types.ObjectId, ref: "Motorcycle" },

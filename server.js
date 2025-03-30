@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const connectDB = require("./config/db");
+const rentalRoutes = require("./routes/rentalRoutes");
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes"); // ✅ Keep only this import
 const User = require("./models/User");
@@ -83,6 +84,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes); // ✅ User routes for managing users
 app.use("/api/motorcycles", motorcycleRoutes);
 app.use("/api/admin", require("./routes/adminRoutes"));
+app.use("/api/rentals", rentalRoutes);
 
 // ✅ Start Server
 const PORT = process.env.PORT || 5000;

@@ -122,18 +122,18 @@ router.patch(
       }
 
       // ✅ Ensure foreign users have a passport before verification
-      if (user.isForeigner && !user.passport) {
-        return res
-          .status(400)
-          .json({ message: "Foreigner users must upload a passport!" });
-      }
+      // if (user.isForeigner && !user.passport) {
+      //   return res
+      //     .status(400)
+      //     .json({ message: "Foreigner users must upload a passport!" });
+      // }
 
       // ✅ Ensure all users have a driving license before verification
-      if (!user.drivingLicense) {
-        return res
-          .status(400)
-          .json({ message: "User must upload a driving license!" });
-      }
+      // if (!user.drivingLicense) {
+      //   return res
+      //     .status(400)
+      //     .json({ message: "User must upload a driving license!" });
+      // }
 
       user.verified = true; // ✅ Set user as verified
       await user.save();
